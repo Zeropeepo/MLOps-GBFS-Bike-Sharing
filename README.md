@@ -359,6 +359,6 @@ Komponen yang direncanakan pada tahap berikutnya:
 
 ## Lisensi
 
-Source code proyek ini menggunakan [MIT License](LICENSE).
+Source code proyek ini menggunakan [Apache-2.0 license](LICENSE).
 
 Data Citi Bike dan sumber data eksternal lainnya tetap mengikuti ketentuan penggunaan dari masing-masing penyedia data.
