@@ -216,3 +216,23 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project datasets
+data/raw/*
+data/interim/*
+data/processed/*
+data/external/*
+
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+
+# Model artifacts
+models/*
+!models/.gitkeep
+
+# Local environment and artifacts
+.env
+mlruns/
+artifacts/

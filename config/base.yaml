@@ -1,0 +1,20 @@
+project:
+  name: gbfs-bike-sharing-forecasting
+  random_seed: 42
+
+data:
+  discovery_url: https://gbfs.citibikenyc.com/gbfs/2.3/gbfs.json
+  polling_interval_seconds: 300
+  timezone: UTC
+
+forecast:
+  horizon_minutes: 30
+  targets:
+    - num_bikes_available
+    - num_docks_available
+
+paths:
+  raw_data: data/raw
+  interim_data: data/interim
+  processed_data: data/processed
+  models: models
