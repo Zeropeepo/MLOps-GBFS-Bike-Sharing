@@ -1,0 +1,60 @@
+{
+  "captured_at_utc": "2026-09-21T15:20:57.314705+00:00",
+  "discovery": {
+    "url": "https://gbfs.citibikenyc.com/gbfs/2.3/gbfs.json",
+    "http_status": 200,
+    "version": "2.3",
+    "last_updated": 1790004036,
+    "ttl": 60
+  },
+  "feeds": {
+    "station_information": {
+      "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
+      "http_status": 200,
+      "version": "2.3",
+      "last_updated": 1790004038,
+      "ttl": 60,
+      "record_count": 2520,
+      "sample_fields": [
+        "capacity",
+        "is_charging",
+        "lat",
+        "lon",
+        "name",
+        "region_id",
+        "rental_uris",
+        "short_name",
+        "station_id"
+      ],
+      "raw_file": "data/raw/station_information_20260921T152057Z.json",
+      "raw_bytes": 1093965,
+      "sha256": "63b7ebec81d8583e95058a676e02441c88cff188bde971a7fdc3bd4108c85159"
+    },
+    "station_status": {
+      "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_status.json",
+      "http_status": 200,
+      "version": "2.3",
+      "last_updated": 1790004038,
+      "ttl": 60,
+      "record_count": 2520,
+      "sample_fields": [
+        "is_installed",
+        "is_renting",
+        "is_returning",
+        "last_reported",
+        "num_bikes_available",
+        "num_bikes_disabled",
+        "num_docks_available",
+        "num_docks_disabled",
+        "num_ebikes_available",
+        "num_scooters_available",
+        "num_scooters_unavailable",
+        "station_id",
+        "vehicle_types_available"
+      ],
+      "raw_file": "data/raw/station_status_20260921T152057Z.json",
+      "raw_bytes": 1630570,
+      "sha256": "4c8c0fed8cb91d7489934512391c7348634622342c652928da0082df2999499f"
+    }
+  }
+}

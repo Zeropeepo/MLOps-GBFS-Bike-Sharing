@@ -236,3 +236,4 @@ models/*
 .env
 mlruns/
 artifacts/
+output/pdf/data_architecture.pdf
