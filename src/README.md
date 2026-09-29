@@ -167,56 +167,19 @@ print("Ringkasan jumlah sepeda:\n", features[
 PY
 ```
 
-Saat menjelaskan hasil, sebutkan jumlah baris yang diproses dari manifest,
-alasan penolakan yang paling sering, dan berapa baris yang sudah memiliki
-target. Jangan menganggap seluruh data ditolak karena satu angka tetap; hasil
-bisa berubah mengikuti keadaan feed saat capture.
+Untuk mengevaluasi hasil, periksa ukuran tabel fitur, jumlah capture, jumlah
+baris yang memiliki target, serta alasan baris ditolak. Nilainya dapat berubah
+pada setiap capture karena mengikuti kondisi feed saat data diambil.
 
-## 4. Bahan penjelasan saat presentasi
+## 4. Catatan penggunaan dan batasan
 
-Contoh uraian singkat:
-
-> Saya mengambil data real-time Citi Bike dari GBFS. Skrip membaca discovery
-> feed untuk menemukan URL status dan informasi stasiun, mengambil kedua feed
-> dengan timeout dan retry, lalu menyimpan JSON bertimestamp agar snapshot lama
-> tetap tersedia. Skrip dapat berjalan terus dengan interval lima menit.
-> Preprocessing memasangkan kedua feed melalui ID stasiun, membuang ID kosong
-> dan duplikat, memvalidasi kapasitas serta jumlah sepeda/dok, lalu membuat
-> fitur rasio dan waktu. Target 30 menit hanya dibuat jika data masa depan yang
-> cocok sudah tersedia.
-
-### Pertanyaan yang mungkin muncul
-
-**Kenapa menyimpan JSON mentah?** Agar hasil asli sumber tetap tersedia untuk
-audit atau pemrosesan ulang.
-
-**Kenapa nilai kosong tidak diganti nol?** Karena nol adalah nilai operasional,
-sedangkan kosong menunjukkan nilai tidak tersedia.
-
-**Apakah `--watch` sama dengan scheduler?** `--watch` mengulang capture selama
-proses tetap hidup. Scheduler eksternal dapat menjalankan skrip satu kali
-secara berkala dan lebih sesuai untuk server.
-
-**Kenapa target 30 menit bisa kosong?** Label memerlukan snapshot pada waktu
-sekitar 30 menit setelah baris saat ini. Capture yang jarang atau baru satu kali
-belum menyediakan pasangan waktu masa depan.
-
-**Apa batasan validasi saat ini?** Skrip belum menolak data hanya karena
-koordinat atau `last_reported` kosong, belum memeriksa umur status stasiun, dan
-belum membandingkan jumlah sepeda/dok terhadap kapasitas. Ini dapat menjadi
-validasi lanjutan setelah aturan sumber dikonfirmasi.
-
-## 5. Kaitan dengan rubrik
-
-| Kriteria | Implementasi yang dapat ditunjukkan |
-| --- | --- |
-| Ingestion dinamis | URL feed diambil dari discovery; request memakai timeout dan retry. |
-| Pengambilan berkala | Opsi `--watch --interval-seconds 300`. |
-| Data tidak tertimpa | Nama JSON memakai timestamp UTC sampai mikrodetik. |
-| Preprocessing | Pembersihan ID, join dua feed, validasi angka, konversi waktu, dan rejection report. |
-| Siap untuk pembelajaran berkelanjutan | Setiap capture menjadi observasi berwaktu; fitur/target dapat diperbarui saat snapshot baru masuk. |
-| Reproducibility | Perintah, nama output, dan manifest dijelaskan di dokumen ini; JSON mentah dipertahankan. |
-
-Catatan: mode polling perlu proses yang tetap hidup. Data GBFS yang tersedia
-sekarang mengikuti versi dan struktur yang diumumkan publisher; jika publisher
-mengubah versi feed, parsing discovery dan tipe timestamp perlu ditinjau lagi.
+- Opsi `--watch` mengulang capture selama proses berjalan. Untuk pengambilan
+  terjadwal, scheduler eksternal dapat menjalankan skrip satu kali secara
+  berkala.
+- Target 30 menit memerlukan snapshot lanjutan yang waktunya sesuai toleransi.
+  Target dibiarkan kosong sampai snapshot tersebut tersedia.
+- Nilai koordinat atau `last_reported` yang kosong tidak otomatis membuat baris
+  ditolak. Skrip juga belum memeriksa umur status stasiun atau konsistensi
+  jumlah sepeda/dok terhadap kapasitas.
+- Feed mengikuti versi dan struktur yang diterbitkan penyedia data. Jika
+  strukturnya berubah, periksa kembali parsing pada skrip ingestion.
