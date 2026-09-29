@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_json(url: str, retries: int, timeout: int) -> tuple[dict[str, Any], int, bytes]:
-    """Ambil JSON. Request diulang beberapa kali jika koneksi atau respons gagal."""
+    """Ambil JSON lewat HTTP dan coba ulang jika koneksi atau respons gagal."""
     for attempt in range(1, retries + 1):
         try:
             response = requests.get(url, timeout=timeout)
@@ -86,7 +86,7 @@ def save_snapshot(
     retries: int = 3,
     timeout: int = 20,
 ) -> Path:
-    """Download kedua feed, simpan file mentah, lalu tulis manifest capture."""
+    """Unduh kedua feed, simpan file mentah, lalu tulis manifest pengambilan."""
     raw_dir.mkdir(parents=True, exist_ok=True)
     evidence_dir.mkdir(parents=True, exist_ok=True)
     captured_at, stamp = next_timestamp(raw_dir, evidence_dir)

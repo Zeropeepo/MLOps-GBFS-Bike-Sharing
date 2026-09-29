@@ -48,13 +48,13 @@ FEATURE_COLUMNS = [
 
 
 def project_path(path: str) -> Path:
-    """Resolve relative paths from the repository root."""
+    """Hitung path relatif dari folder utama repository."""
     result = Path(path).expanduser()
     return result if result.is_absolute() else ROOT_DIR / result
 
 
 def read_stations(path: Path) -> pd.DataFrame:
-    """Read the station list from one raw GBFS JSON file."""
+    """Baca daftar stasiun dari satu file JSON mentah GBFS."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
         raise TypeError(f"Format JSON tidak sesuai: {path.name}")
@@ -72,7 +72,7 @@ def reject(
     station_id: Any,
     reason: str,
 ) -> None:
-    """Add one discarded row to the rejection report."""
+    """Tambahkan satu baris yang ditolak ke laporan penolakan."""
     rejected.append(
         {
             "snapshot_id": snapshot_id,
@@ -89,7 +89,7 @@ def prepare_feed(
     snapshot_id: str,
     rejected: list[dict[str, str]],
 ) -> pd.DataFrame:
-    """Remove rows without an ID and keep the last copy of duplicate IDs."""
+    """Buang ID kosong dan pertahankan salinan terakhir dari ID duplikat."""
     if "station_id" not in frame:
         frame["station_id"] = pd.NA
 
@@ -112,7 +112,7 @@ def prepare_feed(
 
 
 def capture_time(snapshot_id: str) -> str:
-    """Convert the timestamp in a filename to an ISO UTC timestamp."""
+    """Ubah timestamp pada nama file menjadi waktu UTC berformat ISO."""
     if len(snapshot_id) == 22:
         date_format = "%Y%m%dT%H%M%S%fZ"
     else:
@@ -128,15 +128,15 @@ def clean_snapshot(
     status: pd.DataFrame,
     snapshot_id: str,
 ) -> tuple[pd.DataFrame, list[dict[str, str]]]:
-    """Join one feed pair and reject records that fail basic data checks."""
+    """Gabungkan sepasang feed dan catat baris yang gagal validasi dasar."""
     rejected: list[dict[str, str]] = []
     information = prepare_feed(
         information, "station_information", snapshot_id, rejected
     )
     status = prepare_feed(status, "station_status", snapshot_id, rejected)
 
-    # Keep only the fields used by the pipeline. Add missing columns as blank so
-    # that a malformed feed is reported as rejected data instead of a KeyError.
+    # Pilih kolom yang dipakai pipeline. Kolom yang tidak tersedia diisi kosong
+    # agar barisnya bisa dicatat sebagai data yang ditolak.
     information_fields = ["station_id", "name", "lat", "lon", "capacity"]
     status_fields = [
         "station_id",
@@ -232,7 +232,7 @@ def clean_snapshot(
 def make_features(
     observations: pd.DataFrame, target_tolerance_seconds: int
 ) -> pd.DataFrame:
-    """Add time and availability features, plus a target when future data exists."""
+    """Tambahkan fitur waktu dan ketersediaan, serta target jika tersedia."""
     if observations.empty:
         return pd.DataFrame(columns=FEATURE_COLUMNS)
 
@@ -242,7 +242,7 @@ def make_features(
     )
     features = features.sort_values(["station_id", "collected_at_utc"])
 
-    # Calendar and ratio features use only the current and earlier observations.
+    # Fitur kalender dan rasio hanya memakai observasi saat ini dan sebelumnya.
     features["collected_hour_utc"] = features["collected_at_utc"].dt.hour
     features["collected_day_of_week_utc"] = features["collected_at_utc"].dt.dayofweek
     features["is_weekend_utc"] = (features["collected_day_of_week_utc"] >= 5).astype(
@@ -313,7 +313,7 @@ def preprocess(
     processed_dir: Path,
     target_tolerance_seconds: int = 150,
 ) -> dict[str, Any]:
-    """Process all complete snapshot pairs. Raw JSON files are left unchanged."""
+    """Proses semua pasangan snapshot lengkap tanpa mengubah file JSON mentah."""
     snapshots: dict[str, dict[str, Path]] = {}
     for path in sorted(raw_dir.glob("*.json")):
         match = SNAPSHOT_PATTERN.match(path.stem)
