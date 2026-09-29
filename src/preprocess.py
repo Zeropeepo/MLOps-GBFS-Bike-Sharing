@@ -1,4 +1,4 @@
-"""Bersihkan snapshot GBFS dan siapkan tabel fitur stasiun."""
+"""Preprocess snapshot GBFS dan siapkan feature table stasiun."""
 
 from __future__ import annotations
 
@@ -48,13 +48,13 @@ FEATURE_COLUMNS = [
 
 
 def project_path(path: str) -> Path:
-    """Hitung path relatif dari folder utama repository."""
+    """Resolve relative path dari repository root."""
     result = Path(path).expanduser()
     return result if result.is_absolute() else ROOT_DIR / result
 
 
 def read_stations(path: Path) -> pd.DataFrame:
-    """Baca daftar stasiun dari satu file JSON mentah GBFS."""
+    """Read daftar stasiun dari raw GBFS JSON file."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
         raise TypeError(f"Format JSON tidak sesuai: {path.name}")
@@ -72,7 +72,7 @@ def reject(
     station_id: Any,
     reason: str,
 ) -> None:
-    """Tambahkan satu baris yang ditolak ke laporan penolakan."""
+    """Tambahkan satu rejected row ke rejection report."""
     rejected.append(
         {
             "snapshot_id": snapshot_id,
@@ -89,7 +89,7 @@ def prepare_feed(
     snapshot_id: str,
     rejected: list[dict[str, str]],
 ) -> pd.DataFrame:
-    """Buang ID kosong dan pertahankan salinan terakhir dari ID duplikat."""
+    """Remove row tanpa ID dan keep record terakhir untuk duplicate ID."""
     if "station_id" not in frame:
         frame["station_id"] = pd.NA
 
@@ -112,7 +112,7 @@ def prepare_feed(
 
 
 def capture_time(snapshot_id: str) -> str:
-    """Ubah timestamp pada nama file menjadi waktu UTC berformat ISO."""
+    """Convert timestamp di filename menjadi ISO UTC timestamp."""
     if len(snapshot_id) == 22:
         date_format = "%Y%m%dT%H%M%S%fZ"
     else:
@@ -128,15 +128,15 @@ def clean_snapshot(
     status: pd.DataFrame,
     snapshot_id: str,
 ) -> tuple[pd.DataFrame, list[dict[str, str]]]:
-    """Gabungkan sepasang feed dan catat baris yang gagal validasi dasar."""
+    """Join satu pair feed dan reject row yang gagal basic validation."""
     rejected: list[dict[str, str]] = []
     information = prepare_feed(
         information, "station_information", snapshot_id, rejected
     )
     status = prepare_feed(status, "station_status", snapshot_id, rejected)
 
-    # Pilih kolom yang dipakai pipeline. Kolom yang tidak tersedia diisi kosong
-    # agar barisnya bisa dicatat sebagai data yang ditolak.
+    # Pilih kolom yang dipakai pipeline. Missing column diisi blank supaya row
+    # bisa dicatat sebagai rejected data.
     information_fields = ["station_id", "name", "lat", "lon", "capacity"]
     status_fields = [
         "station_id",
@@ -232,7 +232,7 @@ def clean_snapshot(
 def make_features(
     observations: pd.DataFrame, target_tolerance_seconds: int
 ) -> pd.DataFrame:
-    """Tambahkan fitur waktu dan ketersediaan, serta target jika tersedia."""
+    """Tambahkan time dan availability features, plus target jika tersedia."""
     if observations.empty:
         return pd.DataFrame(columns=FEATURE_COLUMNS)
 
@@ -242,7 +242,7 @@ def make_features(
     )
     features = features.sort_values(["station_id", "collected_at_utc"])
 
-    # Fitur kalender dan rasio hanya memakai observasi saat ini dan sebelumnya.
+    # Calendar dan ratio features hanya memakai current dan previous observation.
     features["collected_hour_utc"] = features["collected_at_utc"].dt.hour
     features["collected_day_of_week_utc"] = features["collected_at_utc"].dt.dayofweek
     features["is_weekend_utc"] = (features["collected_day_of_week_utc"] >= 5).astype(
@@ -263,8 +263,8 @@ def make_features(
         1
     )
 
-    # Cari snapshot terdekat dengan waktu t + 30 menit. Toleransi default 150
-    # detik mengakomodasi sedikit pergeseran jadwal polling lima menit.
+    # Cari snapshot terdekat ke waktu t + 30 menit. Tolerance 150 detik
+    # mengakomodasi sedikit pergeseran polling interval lima menit.
     features["target_timestamp_utc"] = features["collected_at_utc"] + pd.Timedelta(
         minutes=30
     )
@@ -313,7 +313,7 @@ def preprocess(
     processed_dir: Path,
     target_tolerance_seconds: int = 150,
 ) -> dict[str, Any]:
-    """Proses semua pasangan snapshot lengkap tanpa mengubah file JSON mentah."""
+    """Process semua complete snapshot pairs tanpa mengubah raw JSON files."""
     snapshots: dict[str, dict[str, Path]] = {}
     for path in sorted(raw_dir.glob("*.json")):
         match = SNAPSHOT_PATTERN.match(path.stem)

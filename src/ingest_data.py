@@ -1,4 +1,4 @@
-"""Ambil snapshot feed GBFS Citi Bike dan simpan sebagai file JSON."""
+"""Capture snapshot feed GBFS Citi Bike dan simpan sebagai raw JSON."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_json(url: str, retries: int, timeout: int) -> tuple[dict[str, Any], int, bytes]:
-    """Ambil JSON lewat HTTP dan coba ulang jika koneksi atau respons gagal."""
+    """Download JSON lewat HTTP dan retry jika koneksi atau response gagal."""
     for attempt in range(1, retries + 1):
         try:
             response = requests.get(url, timeout=timeout)
@@ -43,12 +43,12 @@ def get_json(url: str, retries: int, timeout: int) -> tuple[dict[str, Any], int,
 
 
 def get_feed_urls(discovery: dict[str, Any]) -> dict[str, str]:
-    """Cari URL station_information dan station_status di discovery feed."""
+    """Cari URL station_information dan station_status dari discovery feed."""
     data = discovery.get("data", {})
     if not isinstance(data, dict):
         raise TypeError("Discovery feed tidak memiliki object data")
 
-    # GBFS v2.3 menaruh daftar feed di bawah kode bahasa, biasanya 'en'.
+    # Pada GBFS v2.3, daftar feed berada di bawah language code, biasanya 'en'.
     language_data = data.get("en", {})
     if not isinstance(language_data, dict):
         raise TypeError("Discovery feed tidak memiliki data bahasa 'en'")
@@ -67,7 +67,7 @@ def get_feed_urls(discovery: dict[str, Any]) -> dict[str, str]:
 
 
 def next_timestamp(raw_dir: Path, evidence_dir: Path) -> tuple[datetime, str]:
-    """Buat timestamp UTC yang belum dipakai file snapshot sebelumnya."""
+    """Buat UTC timestamp yang belum dipakai snapshot sebelumnya."""
     captured_at = datetime.now(timezone.utc)
 
     while True:
@@ -86,7 +86,7 @@ def save_snapshot(
     retries: int = 3,
     timeout: int = 20,
 ) -> Path:
-    """Unduh kedua feed, simpan file mentah, lalu tulis manifest pengambilan."""
+    """Download kedua feed, simpan raw files, lalu tulis capture manifest."""
     raw_dir.mkdir(parents=True, exist_ok=True)
     evidence_dir.mkdir(parents=True, exist_ok=True)
     captured_at, stamp = next_timestamp(raw_dir, evidence_dir)
@@ -94,7 +94,7 @@ def save_snapshot(
     discovery, discovery_status, _ = get_json(discovery_url, retries, timeout)
     feed_urls = get_feed_urls(discovery)
 
-    # Ambil kedua feed lebih dulu agar error koneksi tidak meninggalkan pasangan
+    # Download kedua feed lebih dulu agar connection error tidak meninggalkan
     # snapshot yang hanya berisi satu file.
     downloaded: dict[str, tuple[dict[str, Any], int, bytes]] = {}
     for name in FEED_NAMES:
@@ -145,7 +145,7 @@ def save_snapshot(
 
 
 def project_path(path: str) -> Path:
-    """Jadikan path relatif mengarah dari folder utama repository."""
+    """Resolve relative path dari repository root."""
     result = Path(path).expanduser()
     return result if result.is_absolute() else ROOT_DIR / result
 

@@ -1,4 +1,4 @@
-"""Jalur lama untuk menjalankan skrip pengambilan data di src/ingest_data.py."""
+"""Legacy entry point untuk menjalankan ingestion utama di src/ingest_data.py."""
 
 from src.ingest_data import main
 
