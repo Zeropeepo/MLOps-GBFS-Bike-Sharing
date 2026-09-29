@@ -1,4 +1,4 @@
-"""Jalur lama untuk menjalankan skrip ingestion utama di src/ingest_data.py."""
+"""Jalur lama untuk menjalankan skrip pengambilan data di src/ingest_data.py."""
 
 from src.ingest_data import main
 
