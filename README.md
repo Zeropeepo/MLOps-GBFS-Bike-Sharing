@@ -66,6 +66,8 @@ python src/ingest_data.py
 
 Secara default, skrip mencoba setiap request maksimal tiga kali, memakai timeout 20 detik, lalu menyimpan pasangan file JSON dengan timestamp UTC sampai mikrodetik. Snapshot lama tidak ditimpa. Manifest per snapshot mencatat URL, status HTTP, versi feed, jumlah stasiun, ukuran file, dan SHA-256 di `reports/evidence/`.
 
+`src/ingest_data.py` adalah skrip utama. `src/data/ingest_gbfs.py` hanya jalur lama yang meneruskan perintah ke skrip utama; gunakan `ingest_data.py` untuk pekerjaan baru.
+
 ### Menjalankan polling setiap lima menit
 
 ```bash
@@ -95,7 +97,7 @@ Preprocessing mencari pasangan JSON berdasarkan timestamp, mempertahankan file m
 
 * membuang duplikat `station_id` di dalam satu feed dengan mempertahankan record terakhir;
 * menggabungkan feed berdasarkan `station_id` dan mencatat ID yang tidak memiliki pasangan;
-* menolak kapasitas kosong/non-numerik/tidak positif serta hitungan sepeda atau dok kosong/non-numerik/negatif;
+* menolak kapasitas kosong/non-numerik/tidak positif/non-bulat serta hitungan sepeda atau dok yang kosong/non-numerik/negatif/non-bulat;
 * mengubah `last_reported` menjadi UTC dan menormalkan flag operasional menjadi 0/1;
 * mempertahankan nilai yang hilang sebagai kosong, bukan mengubahnya menjadi nol.
 
