@@ -52,7 +52,56 @@ Feed utama yang digunakan adalah:
 | `station_status`      | Jumlah sepeda tersedia, slot kosong, dan status operasional |
 | Trip history          | Informasi perjalanan historis sebagai data pendukung        |
 
-Data mentah tidak disimpan dalam Git karena ukurannya dapat terus bertambah. Direktori data tetap disediakan untuk menjaga struktur proyek.
+Capture operasional yang terus bertambah tidak disimpan dalam Git. Snapshot JSON contoh dilacak di `data/raw/` agar alur preprocessing dapat direproduksi; direktori hasil besar tetap diabaikan.
+
+## Data ingestion dan preprocessing GBFS
+
+Skrip LK-04 mengambil feed `station_information` dan `station_status` melalui discovery endpoint Citi Bike GBFS. Jalankan perintah dari direktori utama repository. Dependency `requests` dan `pandas` sudah tercantum di `requirements.txt`.
+
+### Mengambil satu snapshot
+
+```bash
+python src/ingest_data.py
+```
+
+Secara default, skrip mencoba setiap request maksimal tiga kali, memakai timeout 20 detik, lalu menyimpan pasangan file JSON dengan timestamp UTC sampai mikrodetik. Snapshot lama tidak ditimpa. Manifest per snapshot mencatat URL, status HTTP, versi feed, jumlah stasiun, ukuran file, dan SHA-256 di `reports/evidence/`.
+
+### Menjalankan polling setiap lima menit
+
+```bash
+python src/ingest_data.py --watch --interval-seconds 300
+```
+
+Polling berjalan sampai dihentikan dengan `Ctrl+C`. Jika satu siklus gagal setelah retry, skrip mencatat error dan tetap mencoba pada siklus berikutnya. Untuk penjadwalan yang dikelola di luar proses terminal, jalankan perintah satu kali dari scheduler dengan interval lima menit.
+
+Discovery URL, direktori output, timeout, jumlah retry, dan interval dapat diubah melalui argumen CLI. Contoh:
+
+```bash
+python src/ingest_data.py \
+  --discovery-url https://gbfs.citibikenyc.com/gbfs/2.3/gbfs.json \
+  --raw-dir data/raw \
+  --evidence-dir reports/evidence \
+  --timeout 20 \
+  --retries 3
+```
+
+### Membersihkan dan menggabungkan data
+
+```bash
+python src/preprocess.py
+```
+
+Preprocessing mencari pasangan JSON berdasarkan timestamp, mempertahankan file mentah, lalu:
+
+* membuang duplikat `station_id` di dalam satu feed dengan mempertahankan record terakhir;
+* menggabungkan feed berdasarkan `station_id` dan mencatat ID yang tidak memiliki pasangan;
+* menolak kapasitas kosong/non-numerik/tidak positif serta hitungan sepeda atau dok kosong/non-numerik/negatif;
+* mengubah `last_reported` menjadi UTC dan menormalkan flag operasional menjadi 0/1;
+* mempertahankan nilai yang hilang sebagai kosong, bukan mengubahnya menjadi nol.
+
+Hasil per snapshot dan catatan penolakan disimpan di `data/interim/`. Tabel gabungan fitur disimpan di `data/processed/station_features.csv`; isinya mencakup rasio ketersediaan, fitur waktu UTC, nilai snapshot sebelumnya, dan target observasi sekitar 30 menit ke depan jika snapshot masa depan tersedia dalam toleransi 150 detik. Baris tanpa target tetap tersimpan dengan nilai target kosong. Manifest preprocessing ada di `data/interim/preprocess_manifest.json`.
+
+Direktori hasil yang terus bertambah diabaikan oleh Git. File JSON contoh di `data/raw/` disediakan untuk menjalankan preprocessing tanpa perlu menunggu polling baru.
 
 ## Rencana Pipeline MLOps
 
@@ -343,10 +392,16 @@ Komponen yang telah disiapkan:
 * [x] Rencana initial EDA
 * [x] Penerapan GitHub Flow
 
+Komponen yang telah disiapkan pada tahap ini:
+
+* [x] Pengambilan snapshot GBFS bertimestamp dan manifest per capture
+* [x] Polling berkala dan retry saat terjadi error koneksi
+* [x] Validasi serta preprocessing pasangan feed
+* [x] Sampel data mentah dan tabel hasil preprocessing
+* [x] Dokumentasi cara menjalankan ingestion dan preprocessing
+
 Komponen yang direncanakan pada tahap berikutnya:
 
-* [ ] Pengambilan snapshot GBFS
-* [ ] Validasi data
 * [ ] Initial exploratory data analysis
 * [ ] Pengumpulan data terjadwal
 * [ ] Feature engineering
