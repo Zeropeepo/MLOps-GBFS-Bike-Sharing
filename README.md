@@ -52,7 +52,91 @@ Feed utama yang digunakan adalah:
 | `station_status`      | Jumlah sepeda tersedia, slot kosong, dan status operasional |
 | Trip history          | Informasi perjalanan historis sebagai data pendukung        |
 
-Data mentah tidak disimpan dalam Git karena ukurannya dapat terus bertambah. Direktori data tetap disediakan untuk menjaga struktur proyek.
+Capture operasional yang terus bertambah tidak disimpan langsung dalam Git. Snapshot JSON dan hasil preprocessing dikelola dengan DVC; Git menyimpan file pointer DVC, sedangkan isi dataset berada di cache DVC. Untuk berbagi data lintas mesin, konfigurasi DVC remote diperlukan.
+
+## Data ingestion dan preprocessing GBFS
+
+Skrip LK-04 mengambil feed `station_information` dan `station_status` melalui discovery endpoint Citi Bike GBFS. Jalankan perintah dari direktori utama repository. Dependency `requests` dan `pandas` sudah tercantum di `requirements.txt`.
+
+### Mengambil satu snapshot
+
+```bash
+python src/ingest_data.py
+```
+
+Secara default, skrip mencoba setiap request maksimal tiga kali, memakai timeout 20 detik, lalu menyimpan pasangan file JSON dengan timestamp UTC sampai mikrodetik. Snapshot lama tidak ditimpa. Manifest per snapshot mencatat URL, status HTTP, versi feed, jumlah stasiun, ukuran file, dan SHA-256 di `reports/evidence/`.
+
+`src/ingest_data.py` adalah skrip utama. `src/data/ingest_gbfs.py` hanya jalur lama yang meneruskan perintah ke skrip utama; gunakan `ingest_data.py` untuk pekerjaan baru.
+
+### Menjalankan polling setiap lima menit
+
+```bash
+python src/ingest_data.py --watch --interval-seconds 300
+```
+
+Polling berjalan sampai dihentikan dengan `Ctrl+C`. Jika satu siklus gagal setelah retry, skrip mencatat error dan tetap mencoba pada siklus berikutnya. Untuk penjadwalan yang dikelola di luar proses terminal, jalankan perintah satu kali dari scheduler dengan interval lima menit.
+
+Discovery URL, direktori output, timeout, jumlah retry, dan interval dapat diubah melalui argumen CLI. Contoh:
+
+```bash
+python src/ingest_data.py \
+  --discovery-url https://gbfs.citibikenyc.com/gbfs/2.3/gbfs.json \
+  --raw-dir data/raw \
+  --evidence-dir reports/evidence \
+  --timeout 20 \
+  --retries 3
+```
+
+### Membersihkan dan menggabungkan data
+
+```bash
+python src/preprocess.py
+```
+
+Preprocessing mencari pasangan JSON berdasarkan timestamp, mempertahankan file mentah, lalu:
+
+* membuang duplikat `station_id` di dalam satu feed dengan mempertahankan record terakhir;
+* menggabungkan feed berdasarkan `station_id` dan mencatat ID yang tidak memiliki pasangan;
+* menolak kapasitas kosong/non-numerik/tidak positif/non-bulat serta hitungan sepeda atau dok yang kosong/non-numerik/negatif/non-bulat;
+* mengubah `last_reported` menjadi UTC dan menormalkan flag operasional menjadi 0/1;
+* mempertahankan nilai yang hilang sebagai kosong, bukan mengubahnya menjadi nol.
+
+Hasil per snapshot dan catatan penolakan disimpan di `data/interim/`. Tabel gabungan fitur disimpan di `data/processed/station_features.csv`; isinya mencakup rasio ketersediaan, fitur waktu UTC, nilai snapshot sebelumnya, dan target observasi sekitar 30 menit ke depan jika snapshot masa depan tersedia dalam toleransi 150 detik. Baris tanpa target tetap tersimpan dengan nilai target kosong. Manifest preprocessing ada di `data/interim/preprocess_manifest.json`.
+
+Direktori hasil yang terus bertambah diabaikan oleh Git. Snapshot JSON contoh di `data/raw/` dikelola oleh DVC agar preprocessing dapat dijalankan ulang tanpa menunggu polling baru. Untuk memulihkan data pada clone baru, proyek memerlukan DVC remote dan `dvc pull`.
+
+### Versioning dataset dengan DVC
+
+DVC melacak snapshot mentah pada `data/raw/` dan tabel fitur pada `data/processed/`. File `data/raw.dvc` dan `data/processed.dvc` menyimpan hash serta metadata direktori; file data tidak disimpan sebagai blob Git. Aturan dalam `data/.gitignore` menjaga isi direktori data tetap di luar Git. Setelah instalasi DVC dan `dvc init`, alur versi awal adalah:
+
+```bash
+dvc add data/raw data/processed
+git add data/raw.dvc data/processed.dvc data/.gitignore
+git commit -m "Track initial GBFS data with DVC"
+```
+
+Setelah mengambil snapshot baru, jalankan preprocessing dan perbarui pointer DVC. `dvc unprotect` membuat hasil preprocessing yang dilindungi cache aman untuk ditulis ulang.
+
+```bash
+python src/ingest_data.py
+dvc unprotect data/processed
+python src/preprocess.py
+dvc add data/raw data/processed
+git add data/raw.dvc data/processed.dvc
+git add reports/evidence/gbfs_capture_*.json
+git commit -m "Add new GBFS data version"
+```
+
+Periksa apakah workspace sesuai metadata DVC, lalu bandingkan dua revisi Git yang menyimpan pointer tersebut:
+
+```bash
+dvc status
+dvc diff <commit-awal> <commit-baru> --show-hash
+```
+
+`dvc diff` merangkum file yang ditambahkan atau berubah beserta hash-nya; perintah ini tidak membandingkan isi CSV per baris. Untuk memeriksa pertambahan baris tabel, gunakan `wc -l data/processed/station_features.csv` dan kurangi satu untuk header.
+
+Pada simulasi proyek ini, commit baseline `359df27` dibandingkan dengan versi baru `4b1f91f`: dua snapshot JSON bertambah, direktori `data/raw/` berubah, dan `data/processed/station_features.csv` berubah dari 4.948 menjadi 7.431 baris termasuk header. Simpan file `.dvc` dan `data/.gitignore` di Git agar versi metadata dapat dibandingkan. Jika DVC remote dikonfigurasi, gunakan `dvc push` untuk mengirim isi cache; `git push` hanya mengirim kode dan metadata Git.
 
 ## Rencana Pipeline MLOps
 
@@ -343,10 +427,16 @@ Komponen yang telah disiapkan:
 * [x] Rencana initial EDA
 * [x] Penerapan GitHub Flow
 
+Komponen yang telah disiapkan pada tahap ini:
+
+* [x] Pengambilan snapshot GBFS bertimestamp dan manifest per capture
+* [x] Polling berkala dan retry saat terjadi error koneksi
+* [x] Validasi serta preprocessing pasangan feed
+* [x] Sampel data mentah dan tabel hasil preprocessing
+* [x] Dokumentasi cara menjalankan ingestion dan preprocessing
+
 Komponen yang direncanakan pada tahap berikutnya:
 
-* [ ] Pengambilan snapshot GBFS
-* [ ] Validasi data
 * [ ] Initial exploratory data analysis
 * [ ] Pengumpulan data terjadwal
 * [ ] Feature engineering
