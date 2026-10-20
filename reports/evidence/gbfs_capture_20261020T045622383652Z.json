@@ -1,0 +1,30 @@
+{
+  "captured_at_utc": "2026-10-20T04:56:22.383652+00:00",
+  "discovery": {
+    "url": "https://gbfs.citibikenyc.com/gbfs/2.3/gbfs.json",
+    "http_status": 200,
+    "version": "2.3"
+  },
+  "feeds": {
+    "station_information": {
+      "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
+      "http_status": 200,
+      "version": "2.3",
+      "last_updated": 1792472157,
+      "record_count": 2519,
+      "raw_file": "data/raw/station_information_20261020T045622383652Z.json",
+      "raw_bytes": 801361,
+      "sha256": "4838af13b231f12563df150b410895b824e5822046e0685216d6bb53eb49e8fb"
+    },
+    "station_status": {
+      "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_status.json",
+      "http_status": 200,
+      "version": "2.3",
+      "last_updated": 1792472099,
+      "record_count": 2519,
+      "raw_file": "data/raw/station_status_20261020T045622383652Z.json",
+      "raw_bytes": 1081357,
+      "sha256": "a4e3e20fe31e19c6caa9e020243008582eebd00f0cc133b8a220326007ab1f28"
+    }
+  }
+}
