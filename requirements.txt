@@ -1,4 +1,6 @@
 requests==2.32.3
+dvc[s3]==3.67.1
+mlflow==3.17.2
 pandas==2.2.3
 numpy==2.2.2
 PyYAML==6.0.2
