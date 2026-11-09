@@ -22,6 +22,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
       MLFLOW_TRACKING_URI: http://127.0.0.1:5000
+      GBFS_BASE_PYTHON: ${{ vars.GBFS_BASE_PYTHON }}
     steps:
       - name: Bersihkan bukti dari eksekusi sebelumnya
         run: python3 -c "import os, shutil; shutil.rmtree(os.path.join(os.environ['RUNNER_TEMP'], 'gbfs-mlops'), ignore_errors=True)"
@@ -36,10 +37,11 @@ jobs:
           git rev-parse HEAD
 
       - name: Siapkan Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
+        run: |
+          test -x "$GBFS_BASE_PYTHON" || { echo "Set repository variable GBFS_BASE_PYTHON to Python 3.11 on the runner"; exit 1; }
+          "$GBFS_BASE_PYTHON" -c 'import sys; assert sys.version_info[:2] == (3, 11), "Python 3.11 diperlukan"'
+          "$GBFS_BASE_PYTHON" -m venv "$RUNNER_TEMP/gbfs-venv"
+          echo "$RUNNER_TEMP/gbfs-venv/bin" >> "$GITHUB_PATH"
 
       - name: Pasang dependensi
         run: python -m pip install -r requirements.txt
