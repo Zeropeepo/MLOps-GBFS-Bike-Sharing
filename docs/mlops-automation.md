@@ -18,6 +18,7 @@ Runner memakai GitHub Actions secrets `DVC_ACCESS_KEY_ID` dan
 `DVC_SECRET_ACCESS_KEY` untuk mengakses MinIO lokal, dan `MLFLOW_TRACKING_URI`
 diatur ke `http://127.0.0.1:5000`. Repository variable `GBFS_BASE_PYTHON` berisi
 lokasi Python 3.11 di runner dan dipakai untuk membuat virtual environment.
+Runner juga perlu menyediakan `uv` untuk memasang dependensi proyek.
 Karena penyimpanan berada di komputer lokal,
 komputer, runner, MinIO, dan MLflow harus menyala agar workflow selesai.
 `dvc pull` mengambil versi data sesuai pointer di commit pemicu, bukan menarik
