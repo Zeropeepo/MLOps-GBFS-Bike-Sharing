@@ -136,7 +136,62 @@ dvc diff <commit-awal> <commit-baru> --show-hash
 
 `dvc diff` merangkum file yang ditambahkan atau berubah beserta hash-nya; perintah ini tidak membandingkan isi CSV per baris. Untuk memeriksa pertambahan baris tabel, gunakan `wc -l data/processed/station_features.csv` dan kurangi satu untuk header.
 
-Pada simulasi proyek ini, commit baseline `359df27` dibandingkan dengan versi baru `4b1f91f`: dua snapshot JSON bertambah, direktori `data/raw/` berubah, dan `data/processed/station_features.csv` berubah dari 4.948 menjadi 7.431 baris termasuk header. Simpan file `.dvc` dan `data/.gitignore` di Git agar versi metadata dapat dibandingkan. Jika DVC remote dikonfigurasi, gunakan `dvc push` untuk mengirim isi cache; `git push` hanya mengirim kode dan metadata Git.
+Pada simulasi proyek ini, commit baseline `359df27` dibandingkan dengan versi baru `4b1f91f`: dua snapshot JSON bertambah, direktori `data/raw/` berubah, dan `data/processed/station_features.csv` berubah dari 4.948 menjadi 7.431 baris termasuk header. Simpan file `.dvc` dan `data/.gitignore` di Git agar versi metadata dapat dibandingkan. `git push` mengirim kode dan metadata Git; `dvc push` mengirim object dataset ke DVC remote.
+
+### Menyimpan object DVC ke MinIO lokal
+
+`compose.yaml` menjalankan MinIO lokal dengan named volume agar object tetap tersimpan setelah container dihentikan. Port API dan Console hanya dibuka di komputer lokal. Remote `minio` sudah ditetapkan di `.dvc/config` sebagai endpoint S3-compatible `http://localhost:9000` dengan bucket `dvc-data`.
+
+Tambahkan `MINIO_ROOT_USER` dan `MINIO_ROOT_PASSWORD` dari `.env.example` ke `.env` lokal. Jangan commit `.env`. Setelah Docker Desktop/daemon berjalan, mulai MinIO:
+
+```bash
+docker compose up -d minio
+```
+
+Buka `http://localhost:9001`, masuk menggunakan kredensial dari `.env`, lalu buat bucket bernama `dvc-data`. Setelah bucket dibuat, muat variabel dari `.env` ke shell dan simpan kredensial DVC di konfigurasi lokal yang diabaikan Git:
+
+```bash
+set -a
+source .env
+set +a
+dvc remote modify --local minio access_key_id "$MINIO_ROOT_USER"
+dvc remote modify --local minio secret_access_key "$MINIO_ROOT_PASSWORD"
+```
+
+Kirim object yang dirujuk metadata DVC saat ini ke MinIO:
+
+```bash
+dvc push
+```
+
+Pada clone lain, siapkan MinIO dengan bucket dan kredensial yang sama, lalu jalankan `dvc pull`. `docker compose down` menghentikan service tanpa menghapus named volume; `docker compose down -v` menghapus volume dan seluruh object yang tersimpan di MinIO.
+
+Saat laporan ini diperbarui, konfigurasi remote dan Compose sudah disiapkan, tetapi MinIO belum dijalankan dan `dvc push` belum dilakukan. Karena itu object dataset masih berada di cache lokal sampai langkah di atas dijalankan.
+
+## Training dan tracking eksperimen dengan MLflow
+
+MLflow dipasang di virtual environment lokal melalui `requirements.txt`. Skrip
+`src/modeling/train.py` menjalankan tiga konfigurasi `RandomForestRegressor`
+dengan split kronologis, lalu mencatat parameter, MAE/RMSE/R², model, dan hash
+dataset serta kode ke experiment `GBFS Bike Availability Forecasting`.
+
+Aktifkan environment dan jalankan training dari root repository:
+
+```bash
+source .venv/bin/activate
+python src/modeling/train.py
+```
+
+Untuk membuka dashboard lokal, jalankan di terminal lain:
+
+```bash
+mlflow server --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
+```
+
+Buka `http://127.0.0.1:5000` dan pilih experiment tersebut untuk membandingkan
+run. Database SQLite dan model artifacts MLflow tetap di komputer lokal dan
+diabaikan oleh Git. Laporan hasil beserta parameter model dengan mean RMSE
+terendah ada di `reports/mlflow_experiment_report.md`.
 
 ## Rencana Pipeline MLOps
 
@@ -175,6 +230,8 @@ MLOps-GBFS-Bike-Sharing/
 │   └── figures/
 ├── src/
 ├── .gitignore
+├── .env.example
+├── compose.yaml
 ├── LICENSE
 ├── README.md
 └── requirements.txt

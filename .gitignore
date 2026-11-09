@@ -236,4 +236,15 @@ models/*
 .env
 mlruns/
 artifacts/
+mlartifacts/
+mlflow.db
+mlflow.db-*
 output/pdf/data_architecture.pdf
+
+# Local exports and downloaded/generated artifacts
+/src/Rimba-Nevada.zip
+/src/station_features.csv
+/output/github-actions/
+/output/dvc-metadata.zip
+/reports/evidence/gbfs_capture_*.json
+/tmp/

@@ -1,0 +1,3 @@
+# Nilai sementara untuk demonstrasi. LK-01 belum menetapkan angka RMSE.
+max_rmse_bikes: 5.0
+max_rmse_docks: 5.0

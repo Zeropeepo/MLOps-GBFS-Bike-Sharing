@@ -1,0 +1,7 @@
+[core]
+    remote = minio
+['remote "minio"']
+    url = s3://dvc-data
+    endpointurl = http://localhost:9000
+    region = us-east-1
+    use_ssl = false
