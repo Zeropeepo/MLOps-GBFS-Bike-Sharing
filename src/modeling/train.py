@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -154,6 +156,7 @@ def chronological_split(
     features: pd.DataFrame,
     targets: pd.DataFrame,
     timestamps: pd.Series,
+    label_times: pd.Series | None = None,
 ) -> tuple[
     pd.DataFrame,
     pd.DataFrame,
@@ -170,9 +173,18 @@ def chronological_split(
     )
     cutoff = unique_times[first_test_group]
     train_mask = timestamps < cutoff
+    if label_times is not None:
+        if not label_times.index.equals(timestamps.index) or label_times.isna().any():
+            raise SystemExit("Waktu observasi target tidak lengkap atau tidak selaras.")
+        # Processed observation timestamps are truncated to whole seconds.
+        # Require the entire recorded second to precede validation.
+        train_mask &= label_times + pd.Timedelta(seconds=1) <= cutoff
     test_mask = timestamps >= cutoff
     if not train_mask.any() or not test_mask.any():
-        raise SystemExit("Pembagian kronologis gagal membentuk train dan test set.")
+        raise SystemExit(
+            "Pembagian kronologis gagal membentuk train dan test set tanpa "
+            "menggunakan label masa depan. Tambahkan data berlabel dari waktu lain."
+        )
 
     return (
         features.loc[train_mask],
@@ -182,6 +194,20 @@ def chronological_split(
         timestamps.loc[train_mask],
         timestamps.loc[test_mask],
     )
+
+
+def load_label_times(data_path: Path, labeled_index: pd.Index) -> pd.Series:
+    """Load future-label observation times for the rows used in training."""
+    try:
+        frame = pd.read_csv(data_path, usecols=["target_observation_at_utc"])
+    except ValueError as exc:
+        raise SystemExit("Kolom target_observation_at_utc tidak tersedia.") from exc
+    label_times = pd.to_datetime(
+        frame.loc[labeled_index, "target_observation_at_utc"], utc=True, errors="coerce"
+    )
+    if label_times.isna().any():
+        raise SystemExit("Waktu observasi target tidak lengkap atau tidak valid.")
+    return label_times
 
 
 def build_model(parameters: dict[str, int | None]) -> Pipeline:
@@ -284,6 +310,7 @@ def run_experiment(
 
 
 def write_results_report(
+    report_path: Path,
     experiment: str,
     revision: str,
     worktree_dirty: bool,
@@ -294,7 +321,6 @@ def write_results_report(
     test_rows: int,
     results: list[ExperimentResult],
     best_result: ExperimentResult,
-    registered_version: str,
 ) -> Path:
     comparison_rows = [
         "| Run ID | Hyperparameters | Bikes RMSE | Docks RMSE | Mean RMSE |",
@@ -322,11 +348,10 @@ def write_results_report(
         "",
         *comparison_rows,
         "",
-        "## Model terpilih",
+        "## Kandidat terpilih",
         "",
-        f"- Nama registry: `{REGISTERED_MODEL_NAME}`",
-        f"- Versi registry: `{registered_version}`",
         f"- Run ID: `{best_result.run_id}`",
+        f"- Model URI: `{best_result.model_uri}`",
         f"- Parameter: `{best_result.parameters}`",
         f"- MAE bikes: {metrics['mae_bikes']:.4f}",
         f"- RMSE bikes: {metrics['rmse_bikes']:.4f}",
@@ -340,7 +365,7 @@ def write_results_report(
         "",
     ]
 
-    report_path = ROOT_DIR / "reports/mlflow_experiment_results.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(report_lines), encoding="utf-8")
     return report_path
 
@@ -358,17 +383,36 @@ def main() -> None:
         default=EXPERIMENT_NAME,
         help="Nama experiment MLflow.",
     )
+    parser.add_argument(
+        "--tracking-uri",
+        default=os.environ.get("MLFLOW_TRACKING_URI", f"sqlite:///{ROOT_DIR / 'mlflow.db'}"),
+        help="Alamat MLflow, atau database SQLite lokal jika tidak ditentukan.",
+    )
+    parser.add_argument(
+        "--candidate-output",
+        type=Path,
+        default=ROOT_DIR / "tmp/mlops/candidate.json",
+        help="Lokasi metadata kandidat untuk tahap evaluasi.",
+    )
+    parser.add_argument(
+        "--report-output",
+        type=Path,
+        default=ROOT_DIR / "tmp/mlops/training-results.md",
+        help="Lokasi ringkasan training.",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
+    candidate_path = args.candidate_output.resolve()
+    candidate_path.unlink(missing_ok=True)
     data_path = args.data.resolve()
     X, y, timestamps = load_data(data_path)
+    label_times = load_label_times(data_path, timestamps.index)
     X_train, X_test, y_train, y_test, train_times, test_times = chronological_split(
-        X, y, timestamps
+        X, y, timestamps, label_times
     )
 
-    tracking_db = ROOT_DIR / "mlflow.db"
-    mlflow.set_tracking_uri(f"sqlite:///{tracking_db}")
+    mlflow.set_tracking_uri(args.tracking_uri)
     mlflow.set_experiment(args.experiment)
 
     data_hash = sha256_file(data_path)
@@ -417,15 +461,30 @@ def main() -> None:
         best_result.metrics["rmse_docks"],
     )
 
-    registered = mlflow.register_model(best_result.model_uri, REGISTERED_MODEL_NAME)
-    LOGGER.info(
-        "Registered model=%s version=%s params=%s",
-        REGISTERED_MODEL_NAME,
-        registered.version,
-        best_result.parameters,
+    candidate = {
+        "experiment": args.experiment,
+        "model_name": REGISTERED_MODEL_NAME,
+        "run_id": best_result.run_id,
+        "model_uri": best_result.model_uri,
+        "parameters": best_result.parameters,
+        "metrics": best_result.metrics,
+        "data_sha256": data_hash,
+        "processed_dvc_pointer_sha256": pointer_hash,
+        "git_revision": revision,
+        "train_rows": len(y_train),
+        "validation_rows": len(y_test),
+        "train_end_utc": train_times.max().isoformat(),
+        "train_label_end_utc": label_times.loc[train_times.index].max().isoformat(),
+        "validation_start_utc": test_times.min().isoformat(),
+    }
+    candidate_path.parent.mkdir(parents=True, exist_ok=True)
+    candidate_path.write_text(
+        json.dumps(candidate, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
+    LOGGER.info("Candidate metadata written: %s", candidate_path)
 
     report_path = write_results_report(
+        report_path=args.report_output.resolve(),
         experiment=args.experiment,
         revision=revision,
         worktree_dirty=worktree_dirty,
@@ -436,7 +495,6 @@ def main() -> None:
         test_rows=len(y_test),
         results=results,
         best_result=best_result,
-        registered_version=registered.version,
     )
     LOGGER.info("Markdown report written: %s", report_path)
 

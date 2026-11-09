@@ -2,7 +2,7 @@ name: mlops-gbfs-bike-sharing
 
 services:
   minio:
-    image: minio/minio:RELEASE.2025-10-15T17-29-55Z
+    image: cgr.dev/chainguard/minio@sha256:a1ac4589a5f8136b616e667b48a0bea9719bb10bd45799ea946f24bbedfafde4
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
