@@ -56,7 +56,7 @@ NUMERIC_FEATURES = [
 CATEGORICAL_FEATURES = ["station_id"]
 EXPERIMENT_NAME = "GBFS Bike Availability Forecasting"
 RUNS = (
-    {"n_estimators": 100, "max_depth": 10, "min_samples_leaf": 2},
+    {"n_estimators": 110, "max_depth": 10, "min_samples_leaf": 2},
     {"n_estimators": 200, "max_depth": 16, "min_samples_leaf": 2},
     {"n_estimators": 300, "max_depth": None, "min_samples_leaf": 4},
 )

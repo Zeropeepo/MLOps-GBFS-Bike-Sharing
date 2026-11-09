@@ -24,3 +24,6 @@ komputer, runner, MinIO, dan MLflow harus menyala agar workflow selesai.
 `dvc pull` mengambil versi data sesuai pointer di commit pemicu, bukan menarik
 data baru dari feed GBFS. Pengumpulan snapshot dan pembaruan pointer dilakukan
 secara terpisah sebelum commit.
+
+Simulasi perubahan kode dilakukan dengan mengubah `n_estimators` konfigurasi
+pertama dari 100 menjadi 110. Commit tersebut memicu ulang workflow pada PR.
