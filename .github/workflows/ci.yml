@@ -32,4 +32,4 @@ jobs:
         run: ruff check .
 
       - name: Run tests
-        run: pytest -q
+        run: python -m pytest -q
